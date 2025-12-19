@@ -1,0 +1,7 @@
+{
+  "name": "Gabinete Virtual",
+  "description": "Sistema completo para gestão parlamentar, organização de demandas, cadastro de cidadãos, agenda e documentos com inteligência artificial.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
