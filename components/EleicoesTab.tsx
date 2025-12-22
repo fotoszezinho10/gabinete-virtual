@@ -9,7 +9,8 @@ import {
   Send, 
   Medal, 
   Loader2, 
-  Lightbulb 
+  Lightbulb,
+  AlertCircle
 } from 'lucide-react';
 import { searchElectionData } from '../geminiService';
 
@@ -28,6 +29,7 @@ const EleicoesTab: React.FC = () => {
   const [iaInput, setIaInput] = useState('');
   const [iaResponse, setIaResponse] = useState('');
   const [isIaLoading, setIsIaLoading] = useState(false);
+  const [errorStatus, setErrorStatus] = useState<string | null>(null);
 
   const years = ['2016', '2018', '2020', '2022', '2024'];
 
@@ -53,12 +55,17 @@ const EleicoesTab: React.FC = () => {
     
     setIsIaLoading(true);
     setIaResponse('');
+    setErrorStatus(null);
 
     try {
       const response = await searchElectionData(textToSearch);
       setIaResponse(response);
-    } catch (err) {
-      setIaResponse("Ocorreu um erro inesperado. Verifique o console do navegador.");
+    } catch (err: any) {
+      if (err.message?.includes('429')) {
+        setErrorStatus("O limite de pesquisas gratuitas do Google foi atingido. Aguarde 60 segundos e tente novamente.");
+      } else {
+        setErrorStatus("Ocorreu um erro inesperado. Verifique sua chave API no Vercel.");
+      }
     } finally {
       setIsIaLoading(false);
     }
@@ -151,6 +158,13 @@ const EleicoesTab: React.FC = () => {
                   {isIaLoading ? <Loader2 className="animate-spin" size={24} /> : <Send size={24} />}
                 </button>
               </div>
+
+              {errorStatus && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-center gap-3 text-amber-700 dark:text-amber-400 text-sm font-medium">
+                  <AlertCircle size={18} />
+                  {errorStatus}
+                </div>
+              )}
 
               {!iaResponse && !isIaLoading && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
