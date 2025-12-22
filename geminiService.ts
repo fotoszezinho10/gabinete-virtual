@@ -2,11 +2,18 @@
 import { GoogleGenAI } from "@google/genai";
 import { StorageData } from "./types";
 
-const getAIInstance = () => new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Função para garantir que sempre criamos uma instância nova com a chave atualizada
+const getAI = () => {
+  const apiKey = process.env.API_KEY;
+  if (!apiKey) {
+    throw new Error("Chave API não configurada no ambiente.");
+  }
+  return new GoogleGenAI({ apiKey });
+};
 
 export const generateDocumentContent = async (prompt: string, type: string): Promise<string> => {
   try {
-    const ai = getAIInstance();
+    const ai = getAI();
     const fullPrompt = `Você é o redator oficial do Gabinete do Vereador Ghabriel do Zezinho, na Câmara Municipal de Nova Friburgo.
     Crie um rascunho de um(a) ${type} oficial.
     Contexto do usuário: ${prompt}.
@@ -20,19 +27,17 @@ export const generateDocumentContent = async (prompt: string, type: string): Pro
     });
 
     let text = response.text || "";
-    // Limpeza rigorosa de tags markdown
     text = text.replace(/```html/g, '').replace(/```/g, '').trim();
-    
     return text || "Não foi possível gerar o conteúdo.";
   } catch (error) {
     console.error("AI Generation Error:", error);
-    return "Erro ao conectar com o serviço de IA. Verifique sua chave API.";
+    return "Erro ao conectar com o serviço de IA. Verifique se a chave API no Vercel está correta.";
   }
 };
 
 export const analyzeDocumentImage = async (base64Image: string): Promise<{ title: string; content: string }> => {
   try {
-    const ai = getAIInstance();
+    const ai = getAI();
     const imagePart = {
       inlineData: {
         mimeType: 'image/jpeg',
@@ -58,7 +63,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<{ title
 
 export const generateExecutiveSummary = async (data: StorageData): Promise<string> => {
   try {
-    const ai = getAIInstance();
+    const ai = getAI();
     const stats = {
       total: data.citizens.length,
       demandas: data.demands.length,
@@ -82,7 +87,7 @@ export const generateExecutiveSummary = async (data: StorageData): Promise<strin
 
 export const chatWithCabinetData = async (query: string, data: StorageData): Promise<string> => {
   try {
-    const ai = getAIInstance();
+    const ai = getAI();
     
     const context = {
       totalCidadaos: data.citizens.length,
@@ -118,6 +123,6 @@ export const chatWithCabinetData = async (query: string, data: StorageData): Pro
     }
     return resultText;
   } catch (error) {
-    return "Erro ao processar sua dúvida.";
+    return "Erro ao processar sua dúvida. Verifique a conexão.";
   }
 };

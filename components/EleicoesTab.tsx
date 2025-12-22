@@ -96,7 +96,10 @@ const EleicoesTab: React.FC = () => {
     setIaResponse('');
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) throw new Error("Chave API ausente");
+      
+      const ai = new GoogleGenAI({ apiKey });
       const systemInstruction = `Você é o "Analista Chefe de Inteligência Política" do Gabinete Virtual em Nova Friburgo, RJ.
       Seu objetivo é analisar dados eleitorais históricos (2016-2024) e legislação municipal com precisão ABSOLUTA.
       
@@ -109,30 +112,15 @@ const EleicoesTab: React.FC = () => {
       - 2024: Ghabriel do Zezinho (Vereador) -> 1.541 votos (Eleito).
       
       FONTES DE REFERÊNCIA PRIORITÁRIAS (USE O GOOGLE SEARCH COM FOCO NESTES DOMÍNIOS):
-      
-      ELEIÇÕES:
-      - 2016: placar.eleicoes.uol.com.br/2016/1turno/rj/nova-friburgo, g1.globo.com/rj/regiao-serrana/eleicoes/2016/apuracao/nova-friburgo.html
-      - 2018: especiais.gazetadopovo.com.br/eleicoes/2018/resultados/municipios-rio-de-janeiro/nova-friburgo-rj/
-      - 2020: g1.globo.com/rj/regiao-serrana/eleicoes/2020/resultado-das-apuracoes/nova-friburgo.ghtml, noticias.uol.com.br/eleicoes/2020/apuracao/1turno/rj/nova-friburgo/
-      - 2022: sig.tse.jus.br/ords/dwapr/r/seai/sig-eleicao-resultados/resultado-da-eleição?p0_abrangencia=Município
-      - 2024: g1.globo.com/rj/regiao-serrana/eleicoes/2024/resultado-das-apuracoes/nova-friburgo.ghtml, noticias.uol.com.br/eleicoes/2024/apuracao/1turno/rj/nova-friburgo/
-
-      LEGISLAÇÃO DE NOVA FRIBURGO:
-      - Cespro (Base de Leis): cespro.com.br/visualizarLegislacao.php?cdMunicipio=6811
-      - SAPL (Sistema de Apoio ao Processo Legislativo): sapl.novafriburgo.rj.leg.br/
-
-      SUA MISSÃO:
-      1. Use o Google Search para encontrar dados de ADVERSÁRIOS, QUOCIENTE ELEITORAL ou LEIS MUNICIPAIS, priorizando os links acima.
-      2. Seja técnico, analítico e cite as fontes explicitamente.
-      3. Formate a resposta com análise estratégica, densidade eleitoral e implicações legislativas.`;
+      - 2016-2024: TSE, G1, UOL Eleições.
+      - Legislação: cespro.com.br/visualizarLegislacao.php?cdMunicipio=6811 e sapl.novafriburgo.rj.leg.br/`;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: textToSearch,
         config: {
           systemInstruction,
-          tools: [{ googleSearch: {} }],
-          thinkingConfig: { thinkingBudget: 8000 }
+          tools: [{ googleSearch: {} }]
         }
       });
 
@@ -144,7 +132,8 @@ const EleicoesTab: React.FC = () => {
       }
       setIaResponse(text);
     } catch (err) {
-      setIaResponse("Ocorreu um erro na consulta de inteligência. Por favor, tente novamente.");
+      console.error(err);
+      setIaResponse("Ocorreu um erro na consulta de inteligência. Verifique se a API_KEY no Vercel está correta e faça um redeploy.");
     } finally {
       setIsIaLoading(false);
     }
@@ -152,7 +141,6 @@ const EleicoesTab: React.FC = () => {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      {/* Cabeçalho */}
       <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
         <div>
           <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
@@ -178,8 +166,6 @@ const EleicoesTab: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-        
-        {/* COLUNA ESQUERDA: NOSSA TRAJETÓRIA */}
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2rem] p-6 shadow-sm">
             <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-indigo-500 mb-6 flex items-center gap-2">
@@ -194,35 +180,15 @@ const EleicoesTab: React.FC = () => {
                   </div>
                   <p className="text-xs font-black text-slate-800 dark:text-slate-100 leading-tight">{h.candidate}</p>
                   <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">{h.role}</p>
-                  
-                  {h.context && (
-                    <div className="flex items-center gap-1 text-[8px] text-slate-400 font-bold uppercase mb-2">
-                      <MapPin size={8}/> {h.context}
-                    </div>
-                  )}
-
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <div>
                       <p className="text-[8px] text-slate-400 font-bold uppercase">Votos (NF)</p>
                       <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">{h.votes}</p>
                     </div>
                     <div className="text-right">
-                      {h.totalVotes ? (
-                         <>
-                           <p className="text-[8px] text-slate-400 font-bold uppercase">Total RJ</p>
-                           <p className="text-sm font-black text-slate-700 dark:text-slate-200">{h.totalVotes}</p>
-                         </>
-                      ) : (
-                        <>
-                          <p className="text-[8px] text-slate-400 font-bold uppercase">Válidos</p>
-                          <p className="text-sm font-black text-slate-700 dark:text-slate-200">{h.percent}</p>
-                        </>
-                      )}
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Status</p>
+                      <p className="text-xs font-black text-slate-700 dark:text-slate-200">{h.status}</p>
                     </div>
-                  </div>
-                  <div className="mt-2 pt-2 border-t dark:border-slate-700/50 flex justify-between items-center">
-                    <span className={`text-[9px] font-black uppercase ${h.status === 'Eleito' ? 'text-emerald-500' : 'text-orange-500'}`}>{h.status}</span>
-                    <span className="text-[8px] font-bold text-slate-400 uppercase">{h.scope}</span>
                   </div>
                 </div>
               ))}
@@ -230,15 +196,8 @@ const EleicoesTab: React.FC = () => {
           </div>
         </div>
 
-        {/* COLUNA CENTRAL: AGENTE IA E DADOS GERAIS */}
         <div className="lg:col-span-3 space-y-6">
-          
-          {/* Agente de Pesquisa Especializado */}
           <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5 -rotate-12 pointer-events-none">
-              <Target size={180} />
-            </div>
-            
             <div className="relative z-10">
               <div className="flex items-center gap-4 mb-8">
                 <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-900/20">
@@ -246,7 +205,7 @@ const EleicoesTab: React.FC = () => {
                 </div>
                 <div>
                   <h4 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">Pesquisador Eleitoral e Legislativo</h4>
-                  <p className="text-slate-400 text-sm font-medium">Dados auditados TSE e Base Legal Nova Friburgo (Cespro/SAPL)</p>
+                  <p className="text-slate-400 text-sm font-medium">Dados auditados TSE e Base Legal Nova Friburgo</p>
                 </div>
               </div>
 
@@ -269,7 +228,6 @@ const EleicoesTab: React.FC = () => {
                   </button>
                 </div>
 
-                {/* Sugestões de Pesquisa */}
                 {!iaResponse && !isIaLoading && (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     {suggestions.map((s, idx) => (
@@ -287,62 +245,11 @@ const EleicoesTab: React.FC = () => {
 
                 {iaResponse && (
                   <div className="bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-3xl p-8 text-sm leading-relaxed animate-in slide-in-from-top-4 duration-500 shadow-inner">
-                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 text-xs md:text-sm">
-                      {iaResponse.split('\n').map((line, i) => (
-                        <p key={i} className="mb-2">
-                          {line.includes('[') ? (
-                            line.split(/(\[[^\]]+\]\([^)]+\))/).map((part, j) => {
-                              const match = part.match(/\[([^\]]+)\]\(([^)]+)\)/);
-                              return match ? (
-                                <a key={j} href={match[2]} target="_blank" rel="noopener" className="underline font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 inline-flex items-center gap-1">
-                                  {match[1]} <ExternalLink size={10}/>
-                                </a>
-                              ) : part;
-                            })
-                          ) : line}
-                        </p>
-                      ))}
+                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 text-xs md:text-sm whitespace-pre-line">
+                      {iaResponse}
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-3xl p-8 shadow-sm">
-              <div className="flex justify-between items-start mb-6">
-                <h5 className="font-black text-[10px] uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <BarChart size={16} className="text-indigo-600" /> Panorama de {selectedYear} (NF)
-                </h5>
-                <Info size={14} className="text-slate-300" />
-              </div>
-              <div className="space-y-4">
-                <div className="flex justify-between items-end">
-                  <div>
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Votos Válidos Oficiais (NF)</p>
-                    <p className="text-xl font-black text-slate-800 dark:text-slate-100">~112.500</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-[10px] font-bold text-slate-400 uppercase">Abstenção</p>
-                    <p className="text-sm font-black text-red-500">22.4%</p>
-                  </div>
-                </div>
-                <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-indigo-600 w-[78%]" />
-                </div>
-                <p className="text-[10px] text-slate-400 italic font-medium">Dados consolidados do TRE-RJ para Nova Friburgo.</p>
-              </div>
-            </div>
-
-            <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-3xl p-8 shadow-sm">
-              <h5 className="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-6 flex items-center gap-2">
-                <TrendingUp size={16} className="text-emerald-500" /> Indicadores Estratégicos
-              </h5>
-              <div className="space-y-3">
-                <TrendRow label="Concentração em Nova Friburgo" value="84.0%" trend="up" />
-                <TrendRow label="Quociente Partidário (Est.)" value="~5.100" trend="neutral" />
-                <TrendRow label="Eficiência de Campanha" value="Muito Alta" trend="up" />
               </div>
             </div>
           </div>
@@ -351,15 +258,5 @@ const EleicoesTab: React.FC = () => {
     </div>
   );
 };
-
-const TrendRow = ({ label, value, trend }: { label: string, value: string, trend: 'up' | 'down' | 'neutral' }) => (
-  <div className="flex justify-between items-center p-2 hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-xl transition-colors">
-    <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{label}</span>
-    <div className="flex items-center gap-2">
-      <span className="text-xs font-black dark:text-slate-200">{value}</span>
-      <div className={`w-1.5 h-1.5 rounded-full ${trend === 'up' ? 'bg-emerald-500' : trend === 'down' ? 'bg-red-500' : 'bg-slate-400'}`} />
-    </div>
-  </div>
-);
 
 export default EleicoesTab;
