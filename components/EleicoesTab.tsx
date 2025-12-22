@@ -4,23 +4,14 @@ import {
   History, 
   Search, 
   TrendingUp, 
-  BarChart, 
   MapPin, 
-  User, 
-  ChevronRight, 
-  Sparkles,
-  Loader2,
-  ExternalLink,
-  Bot,
-  Send,
-  Medal,
-  Award,
-  Star,
-  Target,
-  Lightbulb,
-  Info
+  Bot, 
+  Send, 
+  Medal, 
+  Loader2, 
+  Lightbulb 
 } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
+import { searchElectionData } from '../geminiService';
 
 interface HistoricalHighlight {
   year: string;
@@ -30,8 +21,6 @@ interface HistoricalHighlight {
   percent: string;
   status: string;
   scope: 'Municipal' | 'Estadual' | 'Federal';
-  context?: string;
-  totalVotes?: string;
 }
 
 const EleicoesTab: React.FC = () => {
@@ -44,48 +33,18 @@ const EleicoesTab: React.FC = () => {
 
   const cabinetHighlights: HistoricalHighlight[] = [
     { year: '2016', candidate: 'Zezinho do Caminhão', role: 'Vereador', votes: '1.654', percent: '1,64%', status: 'Eleito', scope: 'Municipal' },
-    { 
-      year: '2018', 
-      candidate: 'Áureo Ribeiro', 
-      role: 'Dep. Federal', 
-      votes: '312', 
-      percent: '0,32%', 
-      status: 'Eleito', 
-      scope: 'Federal', 
-      context: 'Votos em Nova Friburgo',
-      totalVotes: '68.414'
-    },
+    { year: '2018', candidate: 'Áureo Ribeiro', role: 'Dep. Federal', votes: '312', percent: '0,32%', status: 'Eleito', scope: 'Federal' },
     { year: '2020', candidate: 'Zezinho do Caminhão', role: 'Vereador', votes: '1.427', percent: '1,51%', status: 'Eleito', scope: 'Municipal' },
-    { 
-      year: '2022', 
-      candidate: 'Áureo Ribeiro', 
-      role: 'Dep. Federal', 
-      votes: '159', 
-      percent: '0,15%', 
-      status: 'Eleito', 
-      scope: 'Federal', 
-      context: 'Votos em Nova Friburgo',
-      totalVotes: '103.321'
-    },
-    { 
-      year: '2022', 
-      candidate: 'Zezinho do Caminhão', 
-      role: 'Dep. Estadual', 
-      votes: '14.752', 
-      percent: '13,5%', 
-      status: 'Suplente', 
-      scope: 'Estadual', 
-      context: 'Votos em Nova Friburgo',
-      totalVotes: '15.699'
-    },
+    { year: '2022', candidate: 'Áureo Ribeiro', role: 'Dep. Federal', votes: '159', percent: '0,15%', status: 'Eleito', scope: 'Federal' },
+    { year: '2022', candidate: 'Zezinho do Caminhão', role: 'Dep. Estadual', votes: '14.752', percent: '13,5%', status: 'Suplente', scope: 'Estadual' },
     { year: '2024', candidate: 'Ghabriel do Zezinho', role: 'Vereador', votes: '1.541', percent: '1,53%', status: 'Eleito', scope: 'Municipal' },
   ];
 
   const suggestions = [
-    "Qual foi o quociente eleitoral para vereador em 2024 em Friburgo?",
-    "Quantos votos o grupo obteve em Nova Friburgo no ano de 2022?",
-    "Comparativo de votos nominais: Zezinho (2016/2020) vs Ghabriel (2024).",
-    "Analise a Lei Orgânica ou Decretos recentes de Nova Friburgo."
+    "Qual foi o quociente eleitoral em 2024 em Friburgo?",
+    "Comparativo: Zezinho (2016) vs Ghabriel (2024).",
+    "Quantos votos Áureo Ribeiro teve em Friburgo em 2022?",
+    "Quais vereadores foram eleitos em 2024 em Nova Friburgo?"
   ];
 
   const handleIaSearch = async (overrideInput?: string) => {
@@ -96,44 +55,10 @@ const EleicoesTab: React.FC = () => {
     setIaResponse('');
 
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) throw new Error("Chave API ausente");
-      
-      const ai = new GoogleGenAI({ apiKey });
-      const systemInstruction = `Você é o "Analista Chefe de Inteligência Política" do Gabinete Virtual em Nova Friburgo, RJ.
-      Seu objetivo é analisar dados eleitorais históricos (2016-2024) e legislação municipal com precisão ABSOLUTA.
-      
-      BASE DE DADOS INTERNA (VERDADE ABSOLUTA - NÃO CONTESTE):
-      - 2016: Zezinho do Caminhão (Vereador) -> 1.654 votos (Eleito).
-      - 2018: Áureo Ribeiro (Federal) -> 312 votos em Nova Friburgo | 68.414 votos totais no RJ (Eleito).
-      - 2020: Zezinho do Caminhão (Vereador) -> 1.427 votos (Eleito).
-      - 2022: Áureo Ribeiro (Federal) -> 159 votos em Nova Friburgo | 103.321 votos totais no RJ (Eleito).
-      - 2022: Zezinho do Caminhão (Estadual) -> 14.752 votos em Nova Friburgo | 15.699 votos totais no RJ (Suplente).
-      - 2024: Ghabriel do Zezinho (Vereador) -> 1.541 votos (Eleito).
-      
-      FONTES DE REFERÊNCIA PRIORITÁRIAS (USE O GOOGLE SEARCH COM FOCO NESTES DOMÍNIOS):
-      - 2016-2024: TSE, G1, UOL Eleições.
-      - Legislação: cespro.com.br/visualizarLegislacao.php?cdMunicipio=6811 e sapl.novafriburgo.rj.leg.br/`;
-
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: textToSearch,
-        config: {
-          systemInstruction,
-          tools: [{ googleSearch: {} }]
-        }
-      });
-
-      let text = response.text || "Não foi possível consolidar os dados neste momento.";
-      const chunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
-      if (chunks) {
-        const links = chunks.map((c: any) => c.web).filter((w: any) => w && w.uri).map((w: any) => `\n- [${w.title}](${w.uri})`).join('');
-        if (links) text += `\n\n**Análise baseada em registros oficiais e IA:**${links}`;
-      }
-      setIaResponse(text);
+      const response = await searchElectionData(textToSearch);
+      setIaResponse(response);
     } catch (err) {
-      console.error(err);
-      setIaResponse("Ocorreu um erro na consulta de inteligência. Verifique se a API_KEY no Vercel está correta e faça um redeploy.");
+      setIaResponse("Ocorreu um erro inesperado. Verifique o console do navegador.");
     } finally {
       setIsIaLoading(false);
     }
@@ -146,9 +71,9 @@ const EleicoesTab: React.FC = () => {
           <h3 className="text-2xl font-black text-slate-800 dark:text-slate-100 flex items-center gap-2">
             <History className="text-indigo-600" /> Inteligência Eleitoral
           </h3>
-          <p className="text-sm text-slate-500 mt-1 text-balance">Consolidado oficial de desempenho e inteligência de dados (Nova Friburgo)</p>
+          <p className="text-sm text-slate-500 mt-1">Dados históricos e comparativos de Nova Friburgo</p>
         </div>
-        <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto no-scrollbar max-w-full">
+        <div className="flex p-1 bg-slate-100 dark:bg-slate-800 rounded-2xl border dark:border-slate-700 overflow-x-auto no-scrollbar">
           {years.map(year => (
             <button 
               key={year}
@@ -169,24 +94,24 @@ const EleicoesTab: React.FC = () => {
         <div className="lg:col-span-1 space-y-6">
           <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2rem] p-6 shadow-sm">
             <h4 className="font-black text-[10px] uppercase tracking-[0.2em] text-indigo-500 mb-6 flex items-center gap-2">
-              <Medal size={16}/> Nossa Trajetória
+              <Medal size={16}/> Histórico do Grupo
             </h4>
             <div className="space-y-4">
-              {cabinetHighlights.map((h, i) => (
-                <div key={i} className={`p-4 rounded-2xl border transition-all hover:scale-[1.02] ${h.year === selectedYear ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-slate-50 dark:bg-slate-800/40 border-transparent dark:border-slate-800'}`}>
+              {cabinetHighlights.filter(h => h.year === selectedYear || selectedYear === 'Todas').map((h, i) => (
+                <div key={i} className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border dark:border-slate-800">
                   <div className="flex justify-between items-start mb-2">
-                    <span className="text-[9px] font-black bg-white dark:bg-slate-700 px-2 py-0.5 rounded-full shadow-sm text-slate-500">{h.year}</span>
-                    <div className={`w-2 h-2 rounded-full ${h.scope === 'Federal' ? 'bg-blue-500' : h.scope === 'Estadual' ? 'bg-emerald-500' : 'bg-indigo-500'}`} />
+                    <span className="text-[9px] font-black bg-white dark:bg-slate-700 px-2 py-0.5 rounded-full text-slate-500">{h.year}</span>
+                    <div className={`w-2 h-2 rounded-full ${h.scope === 'Federal' ? 'bg-blue-500' : 'bg-indigo-500'}`} />
                   </div>
                   <p className="text-xs font-black text-slate-800 dark:text-slate-100 leading-tight">{h.candidate}</p>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tight mb-1">{h.role}</p>
-                  <div className="mt-2 grid grid-cols-2 gap-2">
+                  <p className="text-[10px] font-bold text-slate-400 uppercase mb-2">{h.role}</p>
+                  <div className="grid grid-cols-2 gap-2">
                     <div>
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Votos (NF)</p>
-                      <p className="text-sm font-black text-indigo-600 dark:text-indigo-400">{h.votes}</p>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Votos</p>
+                      <p className="text-sm font-black text-indigo-600">{h.votes}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-[8px] text-slate-400 font-bold uppercase">Status</p>
+                      <p className="text-[8px] text-slate-400 font-bold uppercase">Resultado</p>
                       <p className="text-xs font-black text-slate-700 dark:text-slate-200">{h.status}</p>
                     </div>
                   </div>
@@ -197,60 +122,56 @@ const EleicoesTab: React.FC = () => {
         </div>
 
         <div className="lg:col-span-3 space-y-6">
-          <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] p-8 shadow-sm relative overflow-hidden">
-            <div className="relative z-10">
-              <div className="flex items-center gap-4 mb-8">
-                <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg shadow-indigo-900/20">
-                  <Bot size={32} />
-                </div>
-                <div>
-                  <h4 className="text-2xl font-black tracking-tight text-slate-800 dark:text-slate-100">Pesquisador Eleitoral e Legislativo</h4>
-                  <p className="text-slate-400 text-sm font-medium">Dados auditados TSE e Base Legal Nova Friburgo</p>
-                </div>
+          <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-[2.5rem] p-8 shadow-sm">
+            <div className="flex items-center gap-4 mb-8">
+              <div className="bg-indigo-600 p-4 rounded-2xl text-white shadow-lg">
+                <Bot size={32} />
+              </div>
+              <div>
+                <h4 className="text-2xl font-black text-slate-800 dark:text-slate-100">Pesquisador Eleitoral IA</h4>
+                <p className="text-slate-400 text-sm">Analise resultados do TSE e Quocientes Eleitorais</p>
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="relative">
+                <input 
+                  type="text" 
+                  value={iaInput}
+                  onChange={(e) => setIaInput(e.target.value)}
+                  placeholder="Ex: Qual foi a votação do Ghabriel em 2024?"
+                  className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl px-6 py-5 text-base outline-none focus:ring-4 focus:ring-indigo-500/10 dark:text-slate-100 transition-all"
+                  onKeyPress={(e) => e.key === 'Enter' && handleIaSearch()}
+                />
+                <button 
+                  onClick={() => handleIaSearch()}
+                  disabled={isIaLoading || !iaInput.trim()}
+                  className="absolute right-3 top-3 p-3 bg-indigo-600 text-white rounded-xl disabled:opacity-50"
+                >
+                  {isIaLoading ? <Loader2 className="animate-spin" size={24} /> : <Send size={24} />}
+                </button>
               </div>
 
-              <div className="space-y-6">
-                <div className="relative group">
-                  <input 
-                    type="text" 
-                    value={iaInput}
-                    onChange={(e) => setIaInput(e.target.value)}
-                    placeholder="Compare votações ou pesquise leis de Nova Friburgo..."
-                    className="w-full bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-2xl px-6 py-5 text-base outline-none focus:ring-4 focus:ring-indigo-500/10 placeholder:text-slate-400 dark:text-slate-100 transition-all"
-                    onKeyPress={(e) => e.key === 'Enter' && handleIaSearch()}
-                  />
-                  <button 
-                    onClick={() => handleIaSearch()}
-                    disabled={isIaLoading || !iaInput.trim()}
-                    className="absolute right-3 top-3 p-3 bg-indigo-600 text-white rounded-xl hover:scale-105 active:scale-95 transition-all disabled:opacity-50 shadow-lg"
-                  >
-                    {isIaLoading ? <Loader2 className="animate-spin" size={24} /> : <Send size={24} />}
-                  </button>
+              {!iaResponse && !isIaLoading && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  {suggestions.map((s, idx) => (
+                    <button 
+                      key={idx}
+                      onClick={() => { setIaInput(s); handleIaSearch(s); }}
+                      className="flex items-center gap-3 p-3 text-left bg-slate-50 dark:bg-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border dark:border-slate-700 rounded-xl transition-all"
+                    >
+                      <Lightbulb size={16} className="text-indigo-500" />
+                      <span className="text-xs font-bold text-slate-500">{s}</span>
+                    </button>
+                  ))}
                 </div>
+              )}
 
-                {!iaResponse && !isIaLoading && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    {suggestions.map((s, idx) => (
-                      <button 
-                        key={idx}
-                        onClick={() => { setIaInput(s); handleIaSearch(s); }}
-                        className="flex items-center gap-3 p-3 text-left bg-slate-50 dark:bg-slate-800/50 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 border dark:border-slate-700 rounded-xl transition-all group"
-                      >
-                        <Lightbulb size={16} className="text-indigo-500 shrink-0" />
-                        <span className="text-xs font-bold text-slate-500 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">{s}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {iaResponse && (
-                  <div className="bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-3xl p-8 text-sm leading-relaxed animate-in slide-in-from-top-4 duration-500 shadow-inner">
-                    <div className="prose prose-slate dark:prose-invert max-w-none text-slate-600 dark:text-slate-300 text-xs md:text-sm whitespace-pre-line">
-                      {iaResponse}
-                    </div>
-                  </div>
-                )}
-              </div>
+              {iaResponse && (
+                <div className="bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-3xl p-8 text-sm leading-relaxed whitespace-pre-line shadow-inner">
+                  {iaResponse}
+                </div>
+              )}
             </div>
           </div>
         </div>
