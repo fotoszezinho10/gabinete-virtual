@@ -10,7 +10,8 @@ import {
   Medal, 
   Loader2, 
   Lightbulb,
-  AlertCircle
+  AlertCircle,
+  ExternalLink
 } from 'lucide-react';
 import { searchElectionData } from '../geminiService';
 
@@ -61,10 +62,10 @@ const EleicoesTab: React.FC = () => {
       const response = await searchElectionData(textToSearch);
       setIaResponse(response);
     } catch (err: any) {
-      if (err.message?.includes('429')) {
-        setErrorStatus("O limite de pesquisas gratuitas do Google foi atingido. Aguarde 60 segundos e tente novamente.");
+      if (err.message === "LIMITE_API_ESTOURADO") {
+        setErrorStatus("Limite de pesquisa do Google atingido. Para resolver, ative o faturamento (Billing) no Google AI Studio. Assinar Google One não resolve este erro.");
       } else {
-        setErrorStatus("Ocorreu um erro inesperado. Verifique sua chave API no Vercel.");
+        setErrorStatus("Erro na consulta. Tente novamente em instantes.");
       }
     } finally {
       setIsIaLoading(false);
@@ -160,13 +161,24 @@ const EleicoesTab: React.FC = () => {
               </div>
 
               {errorStatus && (
-                <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-4 rounded-xl flex items-center gap-3 text-amber-700 dark:text-amber-400 text-sm font-medium">
-                  <AlertCircle size={18} />
-                  {errorStatus}
+                <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-6 rounded-2xl flex flex-col md:flex-row items-center gap-4 text-red-700 dark:text-red-400">
+                  <AlertCircle size={32} className="shrink-0" />
+                  <div className="text-sm">
+                    <p className="font-bold mb-1">Cota da API do Google Excedida</p>
+                    <p className="opacity-80 mb-3">{errorStatus}</p>
+                    <a 
+                      href="https://aistudio.google.com/app/billing" 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-red-700 transition-all"
+                    >
+                      Configurar Billing no AI Studio <ExternalLink size={14}/>
+                    </a>
+                  </div>
                 </div>
               )}
 
-              {!iaResponse && !isIaLoading && (
+              {!iaResponse && !isIaLoading && !errorStatus && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {suggestions.map((s, idx) => (
                     <button 
@@ -182,7 +194,7 @@ const EleicoesTab: React.FC = () => {
               )}
 
               {iaResponse && (
-                <div className="bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-3xl p-8 text-sm leading-relaxed whitespace-pre-line shadow-inner">
+                <div className="bg-slate-50 dark:bg-slate-800/50 border dark:border-slate-700 rounded-3xl p-8 text-sm leading-relaxed whitespace-pre-line shadow-inner animate-in fade-in">
                   {iaResponse}
                 </div>
               )}

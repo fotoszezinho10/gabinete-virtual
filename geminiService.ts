@@ -4,8 +4,7 @@ import { StorageData } from "./types";
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
-// Função de retentativa com Jitter (variação aleatória) para evitar bloqueios de rede
-async function callWithRetry(fn: () => Promise<any>, maxRetries = 3): Promise<any> {
+async function callWithRetry(fn: () => Promise<any>, maxRetries = 2): Promise<any> {
   let lastError: any;
   for (let i = 0; i < maxRetries; i++) {
     try {
@@ -13,14 +12,14 @@ async function callWithRetry(fn: () => Promise<any>, maxRetries = 3): Promise<an
     } catch (error: any) {
       lastError = error;
       const errorStr = JSON.stringify(error).toUpperCase();
-      const isQuota = errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED') || errorStr.includes('QUOTA');
-      
-      if (isQuota && i < maxRetries - 1) {
-        // Espera progressiva: 8s, 16s... com um pouco de variação aleatória
-        const waitTime = (Math.pow(2, i) * 8000) + (Math.random() * 2000); 
-        console.warn(`[IA] Limite atingido. Tentativa ${i + 1}/${maxRetries}. Aguardando ${Math.round(waitTime/1000)}s...`);
-        await delay(waitTime);
-        continue;
+      // Se for erro de cota ou limite exaurido
+      if (errorStr.includes('429') || errorStr.includes('RESOURCE_EXHAUSTED')) {
+        if (i < maxRetries - 1) {
+          await delay(5000 * (i + 1));
+          continue;
+        }
+        // Erro amigável para o usuário sobre o AI Studio
+        throw new Error("LIMITE_API_ESTOURADO");
       }
       throw error;
     }
@@ -34,11 +33,12 @@ const getAI = () => {
   return new GoogleGenAI({ apiKey });
 };
 
+// Usando Flash Lite para documentos (mais rápido e cota maior)
 export const generateDocumentContent = async (prompt: string, type: string): Promise<string> => {
   return callWithRetry(async () => {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
+      model: 'gemini-flash-lite-latest',
       contents: `Gere um ${type} oficial para o Vereador Ghabriel do Zezinho: ${prompt}`,
       config: { thinkingConfig: { thinkingBudget: 0 } }
     });
@@ -50,7 +50,7 @@ export const analyzeDocumentImage = async (base64Image: string): Promise<{ title
   return callWithRetry(async () => {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-pro-preview',
+      model: 'gemini-3-flash-preview', // Flash é suficiente para OCR e mais barato que Pro
       contents: { 
         parts: [
           { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
@@ -70,7 +70,7 @@ export const chatWithCabinetData = async (query: string, data: StorageData): Pro
       model: 'gemini-3-flash-preview',
       contents: query,
       config: {
-        systemInstruction: `Assessor Legislativo. Cidadãos: ${data.citizens.length}, Demandas: ${data.demands.length}.`,
+        systemInstruction: `Assessor Legislativo. Cidadãos: ${data.citizens.length}, Demandas: ${data.demands.length}. Use Google Search para fatos externos.`,
         tools: [{ googleSearch: {} }]
       }
     });
@@ -92,7 +92,7 @@ export const searchElectionData = async (query: string): Promise<string> => {
       model: 'gemini-3-flash-preview',
       contents: query,
       config: {
-        systemInstruction: "Analista Eleitoral de Nova Friburgo. Use busca para dados do TSE e quocientes.",
+        systemInstruction: "Analista Eleitoral. Use o Google Search para dados do TSE e notícias de Nova Friburgo.",
         tools: [{ googleSearch: {} }]
       }
     });
@@ -111,8 +111,8 @@ export const generateExecutiveSummary = async (data: StorageData): Promise<strin
   return callWithRetry(async () => {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `Resuma o status do gabinete: ${data.citizens.length} cidadãos e ${data.demands.length} demandas.`,
+      model: 'gemini-flash-lite-latest',
+      contents: `Resuma o status: ${data.citizens.length} cidadãos e ${data.demands.length} demandas.`,
       config: { thinkingConfig: { thinkingBudget: 0 } }
     });
     return response.text || "Resumo indisponível.";
