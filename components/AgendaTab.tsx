@@ -15,7 +15,8 @@ import {
   ChevronRight, 
   LayoutList, 
   Columns, 
-  Grid3X3 
+  Grid3X3,
+  ShieldAlert
 } from 'lucide-react';
 import { crud, subscribeToChanges } from '../storageService';
 import { Appointment } from '../types';
@@ -28,7 +29,9 @@ const AgendaTab: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingAppt, setEditingAppt] = useState<Appointment | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showRlsWarning, setShowRlsWarning] = useState(false);
   
   // Estados de Visualização
   const [viewMode, setViewMode] = useState<ViewMode>('week');
@@ -57,7 +60,7 @@ const AgendaTab: React.FC = () => {
 
   const filtered = appointments.filter(a => 
     a.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    a.description.toLowerCase().includes(searchTerm.toLowerCase())
+    (a.description && a.description.toLowerCase().includes(searchTerm.toLowerCase()))
   ).sort((a, b) => new Date(`${a.date}T${a.time}`).getTime() - new Date(`${b.date}T${b.time}`).getTime());
 
   // Funções de Navegação
@@ -140,6 +143,31 @@ const AgendaTab: React.FC = () => {
     }
   };
 
+  const handleDelete = async (id: string, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    
+    if (!window.confirm('Tem certeza que deseja excluir este compromisso permanentemente?')) return;
+    
+    setIsDeleting(true);
+    try {
+      await crud.deleteAppointment(id);
+      setIsModalOpen(false);
+      setEditingAppt(null);
+    } catch (err: any) {
+      console.error("Erro na exclusão:", err);
+      if (err.code === '42501' || err.message?.includes('42501')) {
+        setShowRlsWarning(true);
+      } else {
+        alert(`Erro ao excluir: ${err.message || 'Erro desconhecido'}`);
+      }
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="h-64 flex flex-col items-center justify-center text-slate-400 gap-3">
@@ -151,6 +179,32 @@ const AgendaTab: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {showRlsWarning && (
+        <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 p-6 rounded-[2rem] animate-in zoom-in-95 flex flex-col md:flex-row gap-6 items-center">
+          <div className="p-4 bg-red-100 dark:bg-red-900/50 text-red-600 rounded-2xl shrink-0">
+            <ShieldAlert size={32} />
+          </div>
+          <div className="flex-1">
+            <h4 className="font-black text-red-800 dark:text-red-400 text-lg mb-2">Permissão de Exclusão Negada</h4>
+            <p className="text-sm text-red-700 dark:text-red-300 leading-relaxed mb-4">
+              O Supabase bloqueou a exclusão. Execute este comando no <b>SQL Editor</b> do painel Supabase para liberar:
+            </p>
+            <div className="bg-black/90 p-4 rounded-xl font-mono text-xs text-emerald-400 border border-white/10 relative group">
+              <code>ALTER TABLE appointments DISABLE ROW LEVEL SECURITY;</code>
+              <button 
+                onClick={() => { navigator.clipboard.writeText('ALTER TABLE appointments DISABLE ROW LEVEL SECURITY;'); alert('Comando copiado!'); }}
+                className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/10 hover:bg-white/20 p-2 rounded-lg text-white text-[10px]"
+              >
+                Copiar
+              </button>
+            </div>
+          </div>
+          <button onClick={() => setShowRlsWarning(false)} className="p-2 text-red-400 hover:text-red-600 transition-transform hover:scale-110">
+            <X size={20}/>
+          </button>
+        </div>
+      )}
+
       {/* Cabeçalho de Controle */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-2xl border dark:border-slate-800 shadow-sm">
         <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
@@ -207,7 +261,7 @@ const AgendaTab: React.FC = () => {
                   key={appt.id} 
                   appt={appt} 
                   onEdit={() => { setEditingAppt(appt); setIsModalOpen(true); }}
-                  onDelete={() => crud.deleteAppointment(appt.id)}
+                  onDelete={(e) => handleDelete(appt.id, e)}
                 />
               ))
             )}
@@ -233,13 +287,22 @@ const AgendaTab: React.FC = () => {
                     {dayAppts.map(appt => (
                       <div 
                         key={appt.id} 
+                        className="p-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-lg cursor-pointer hover:scale-[1.02] transition shadow-sm group relative"
                         onClick={() => { setEditingAppt(appt); setIsModalOpen(true); }}
-                        className="p-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-100 dark:border-blue-800 rounded-lg cursor-pointer hover:scale-[1.02] transition shadow-sm"
                       >
-                        <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                          <Clock size={10} /> {appt.time}
-                        </p>
-                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate">{appt.title}</p>
+                        <div className="flex justify-between items-start">
+                          <p className="text-[10px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                            <Clock size={10} /> {appt.time}
+                          </p>
+                          <button 
+                            onClick={(e) => handleDelete(appt.id, e)}
+                            className="text-slate-400 hover:text-red-500 transition-colors p-1 rounded-md bg-white/50 dark:bg-slate-800/50"
+                            title="Excluir"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                        <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate pr-4">{appt.title}</p>
                       </div>
                     ))}
                     <button 
@@ -329,9 +392,22 @@ const AgendaTab: React.FC = () => {
                 <label className="block text-[10px] font-bold text-slate-400 uppercase mb-1 tracking-wider">Descrição</label>
                 <textarea name="description" rows={3} defaultValue={editingAppt?.description} className="w-full p-3 bg-slate-50 dark:bg-slate-800 border dark:border-slate-700 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none dark:text-slate-100" />
               </div>
-              <div className="pt-6 flex gap-4">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-6 py-3 border dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition font-bold text-slate-500">Cancelar</button>
-                <button type="submit" className="flex-1 px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 dark:shadow-none transition font-bold">Salvar Agenda</button>
+              <div className="pt-6 flex flex-wrap gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-6 py-3 border dark:border-slate-700 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 transition font-bold text-slate-500 min-w-[120px]">Cancelar</button>
+                
+                {editingAppt?.id && (
+                  <button 
+                    type="button" 
+                    onClick={(e) => handleDelete(editingAppt.id, e)} 
+                    disabled={isDeleting}
+                    className="flex-1 px-6 py-3 bg-red-50 text-red-600 border border-red-200 rounded-xl hover:bg-red-100 transition font-bold flex items-center justify-center gap-2 min-w-[120px]"
+                  >
+                    {isDeleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
+                    Excluir
+                  </button>
+                )}
+                
+                <button type="submit" className="flex-[2] px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-100 dark:shadow-none transition font-bold min-w-[180px]">Salvar Agenda</button>
               </div>
             </form>
           </div>
@@ -357,11 +433,11 @@ const ViewButton = ({ active, onClick, icon: Icon, label }: any) => (
 const AppointmentCard: React.FC<{
   appt: Appointment;
   onEdit: () => void;
-  onDelete: () => any;
+  onDelete: (e: React.MouseEvent) => void;
 }> = ({ appt, onEdit, onDelete }) => (
   <div className="bg-white dark:bg-slate-900 border dark:border-slate-800 rounded-2xl p-5 hover:shadow-md transition group border-l-4 border-l-blue-500">
     <div className="flex justify-between items-start">
-      <div className="space-y-3">
+      <div className="space-y-3 cursor-pointer flex-1" onClick={onEdit}>
         <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 leading-none">{appt.title}</h3>
         <div className="flex flex-wrap gap-x-6 gap-y-2 text-xs font-medium text-slate-500 dark:text-slate-400">
           <span className="flex items-center gap-1.5"><CalendarIcon size={14} className="text-blue-500" /> {new Date(appt.date).toLocaleDateString('pt-BR')}</span>
@@ -370,11 +446,11 @@ const AppointmentCard: React.FC<{
         </div>
         {appt.description && <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 max-w-2xl">{appt.description}</p>}
       </div>
-      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-        <button onClick={onEdit} className="p-2 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-xl transition">
+      <div className="flex gap-1 shrink-0 ml-4">
+        <button onClick={onEdit} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-blue-600 dark:text-blue-400 rounded-xl transition hover:bg-blue-50">
           <Edit2 size={18} />
         </button>
-        <button onClick={() => { if(confirm('Excluir?')) onDelete(); }} className="p-2 hover:bg-red-50 dark:hover:bg-red-900/20 text-red-600 dark:text-red-400 rounded-xl transition">
+        <button onClick={onDelete} className="p-2.5 bg-slate-50 dark:bg-slate-800 text-red-600 dark:text-red-400 rounded-xl transition hover:bg-red-50">
           <Trash2 size={18} />
         </button>
       </div>
